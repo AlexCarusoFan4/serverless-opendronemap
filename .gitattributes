@@ -1,3 +1,5 @@
 * text=auto
+/assets/settings/**/*.yaml text eol=lf
 /docker/entry.sh text eol=lf
+settings.yaml text eol=lf
 userdata.sh text eol=lf
