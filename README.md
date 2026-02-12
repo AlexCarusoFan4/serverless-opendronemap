@@ -73,7 +73,7 @@ this, but any client will work.
 
 Make sure your folder name doesn't contain any spaces or problematic characters.
 
-You can also optionally upload a settings.yaml file where you set the parameters (https://docs.opendronemap.org/arguments/) for the ODM processing job.
+You can also optionally upload a settings.yaml file where you set the parameters (https://docs.opendronemap.org/arguments/) for the ODM processing job (NOTE: this file will need to have Linux file endings (LF) to be read successfully by the OpenDroneMap instance).
 
 Some pre-set options have been provided in the repository here: [serverless-opendronemap/assets/settings](/assets/settings).
 
