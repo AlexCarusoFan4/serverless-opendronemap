@@ -18,11 +18,19 @@ if [ -n "$SSD_DISKS" ]; then
     DEVICES=$(/usr/bin/echo "$SSD_DISKS" | /usr/bin/sed 's|^|/dev/|' | /usr/bin/tr '\n' ' ')
     DISK_COUNT=$(/usr/bin/echo "$SSD_DISKS" | /usr/bin/wc -w)
     
-    /usr/sbin/mdadm --create --verbose /dev/md0 --level=0 --name=scratch --raid-devices=$DISK_COUNT $DEVICES
-    /usr/sbin/mkfs.xfs -f /dev/md0
+    if [ "$DISK_COUNT" -eq 1 ]; then
+        /usr/bin/echo "Single NVMe found. Formatting directly."
+        TARGET_DEV=$DEVICES
+        /usr/sbin/mkfs.xfs -f $TARGET_DEV
+    else
+        /usr/bin/echo "Multiple NVMe found. Creating RAID 0."
+        /usr/sbin/mdadm --create --verbose /dev/md0 --level=0 --name=scratch --raid-devices=$DISK_COUNT $DEVICES
+        TARGET_DEV="/dev/md0"
+        /usr/sbin/mkfs.xfs -f $TARGET_DEV
+    fi
     
     /usr/bin/mkdir -p /mnt/odm_data
-    /usr/bin/mount /dev/md0 /mnt/odm_data
+    /usr/bin/mount $TARGET_DEV /mnt/odm_data
     /usr/bin/chmod 777 /mnt/odm_data
     
     # Swap

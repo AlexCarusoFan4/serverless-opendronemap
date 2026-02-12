@@ -14,19 +14,11 @@ trap 'handle_error' ERR
 
 echo "Launching Serverless OpenDroneMap"
 
-# --- 1. WAIT FOR HOST RAID ---
-echo "Waiting for Host RAID signal..."
+# --- 1. WAIT FOR HOST ---
+echo "Waiting for Host signal..."
 while [ ! -f /local/host_ready.txt ]; do
     sleep 5
 done
-
-# --- 2. VERIFY STORAGE SIZE ---
-AVAILABLE_SPACE=$(df /local | awk 'NR==2 {print $4}')
-if [ "$AVAILABLE_SPACE" -lt 1000000000 ]; then
-    echo "CRITICAL: /local is too small. NVMe mount failed."
-    handle_error
-fi
-echo "NVMe Storage Verified."
 
 # --- 3. CONFIGURE PATHS ---
 BUCKET="$4"
