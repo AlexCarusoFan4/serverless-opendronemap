@@ -18,7 +18,6 @@ const fs = require('fs');
 const path = require('path');
 const awsConfig = require('../awsconfig.json');
 
-// eslint-disable-next-line no-underscore-dangle
 const directory = path.resolve();
 
 export class ServerlessOdmStack extends cdk.Stack {
@@ -42,7 +41,6 @@ export class ServerlessOdmStack extends cdk.Stack {
     setupCommands.addCommands(userData);
 
     const multipartUserData = new ec2.MultipartUserData();
-    // The docker has to be configured at early stage, so content type is overridden to boothook
     multipartUserData.addPart(ec2.MultipartBody.fromUserData(setupCommands, 'text/x-shellscript; charset="us-ascii"'));
 
     const launchTemplate = new ec2.LaunchTemplate(this, 'LaunchTemplate', {
@@ -51,7 +49,7 @@ export class ServerlessOdmStack extends cdk.Stack {
       blockDevices: [
         {
           deviceName: '/dev/xvda',
-          volume: ec2.BlockDeviceVolume.ebs(100, {
+          volume: ec2.BlockDeviceVolume.ebs(50, { 
             volumeType: ec2.EbsDeviceVolumeType.GP3
           })
         }
@@ -60,8 +58,11 @@ export class ServerlessOdmStack extends cdk.Stack {
 
     const dockerRole = new iam.Role(this, 'InstanceRole', {
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
-      description: 'Execution role for the docker container, has access to the Serverless ODM S3 bucket',
-      managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonEC2ContainerServiceforEC2Role')]
+      description: 'Execution role for the docker container',
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonEC2ContainerServiceforEC2Role'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore')
+      ]
     });
 
     const awsManagedEnvironment = new batch.ManagedEc2EcsComputeEnvironment(this, 'ServerlessOdmCE', {
@@ -83,7 +84,7 @@ export class ServerlessOdmStack extends cdk.Stack {
     });
 
     const dockerImage = new DockerImageAsset(this, 'ServerlessOdmDockerImage', {
-      directory: path.join(directory, awsConfig.computeEnv.useGpu ? 'dockergpu' : 'docker'),
+      directory: path.join(directory, 'docker'),
     });
 
     const logging = new ecs.AwsLogDriver({ streamPrefix: "serverlessodmruns" })
@@ -99,15 +100,17 @@ export class ServerlessOdmStack extends cdk.Stack {
           'Ref::key',
           'output',
         ],
-        gpu: awsConfig.computeEnv.useGpu ? 1 : 0,
         image: ecs.ContainerImage.fromDockerImageAsset(dockerImage),
-        memory: cdk.Size.mebibytes(120000),
-        cpu: 1,
+        memory: cdk.Size.mebibytes(awsConfig.computeEnv.desiredMemory),
+        cpu: awsConfig.computeEnv.desiredCpus, 
         privileged: true,
-        volumes: [batch.EcsVolume.host({
-          name: 'local',
-          containerPath: '/local'
-        })],
+        volumes: [
+            batch.EcsVolume.host({
+                name: 'local',
+                hostPath: '/mnt/odm_data', 
+                containerPath: '/local'
+            })
+        ],
         logging: logging
       }),
     });

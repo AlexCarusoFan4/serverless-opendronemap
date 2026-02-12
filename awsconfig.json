@@ -1,10 +1,11 @@
 {
   "computeEnv": {
-    "useGpu": false,
     "minvCpus": 0,
-    "maxvCpus": 128,
+    "maxvCpus": 256,
+    "desiredMemory": 60000,
+    "desiredCpus": 7,
     "instanceTypes": [
-      "r5.4xlarge"
+      "r6id.2xlarge"
     ]
   },
   "notificationEmail": "john.doe@example.com"

@@ -32,8 +32,13 @@ Configure the AWS CLI client with credentials and details for your deployment AW
 
 Make sure you are using an account or role with adequate permissions to deploy all of the resources.
 
-The stack can be configured in `awsconfig.json`, which is where you'll set instance types, whether
-to use a GPU, the target CPU requirements and an email address to subscribe to batch job notifications.
+The stack can be configured in `awsconfig.json`, which is where you'll set instance types, the target CPU and memory requirements and an email address to subscribe to batch job notifications.
+
+Please note that you will need to use an instance type that has a "d" suffix (indicating "Disk").
+
+The disk will need to have enough space to hold your imagery dataset and any temporary files generating during the OpenDroneMap processing run.
+
+The default r6id.2xlarge should be suitable for most jobs at a good price point.
 
 Prior to deployment, make sure Docker is running (required to build the docker container image).
 

@@ -1,59 +1,77 @@
 #!/bin/bash
 
-#set -e
+handle_error() {
+    echo "!!! JOB FAILED !!!"
+    df -h
+    echo "Diagnostic: Directory Contents"
+    ls -al /local/code
+    echo "SLEEPING 2 HOURS FOR DEBUGGING..."
+    sleep 7200
+    exit 1
+}
 
-# Copyright 2021-2022 Howard Butler <howard@hobu.co>
-# with contributions from Michael D. Smith <https://github.com/msmitherdc>
-
-# The following code is a derivative work of the code from the codm project,
-# which is licensed GPLv3. This code therefore is also licensed under the terms
-# of the GNU Public License, verison 3.
+trap 'handle_error' ERR
 
 echo "Launching Serverless OpenDroneMap"
 
+# --- 1. WAIT FOR HOST RAID ---
+echo "Waiting for Host RAID signal..."
+while [ ! -f /local/host_ready.txt ]; do
+    sleep 5
+done
+
+# --- 2. VERIFY STORAGE SIZE ---
+AVAILABLE_SPACE=$(df /local | awk 'NR==2 {print $4}')
+if [ "$AVAILABLE_SPACE" -lt 1000000000 ]; then
+    echo "CRITICAL: /local is too small. NVMe mount failed."
+    handle_error
+fi
+echo "NVMe Storage Verified."
+
+# --- 3. CONFIGURE PATHS ---
 BUCKET="$4"
 KEY="$5"
 OUTPUT="$6"
 
-echo "processing images from '$KEY' in bucket $BUCKET to $OUTPUT"
+mkdir -p /local/code/images
+mkdir -p /local/code/tmp
 
-cd /code
+export TMPDIR=/local/code/tmp
+export TEMP=/local/code/tmp
+export TMP=/local/code/tmp
 
-mkdir /local/images
-ln -s /local/images /code/images
+echo "Temporary Directory set to: $TMPDIR"
 
-aws s3 sync s3://$BUCKET/$KEY/ /local/images --no-progress
-
+# --- 4. DOWNLOAD DATA ---
+cd /local/code
+echo "Downloading imagery..."
+aws s3 sync s3://$BUCKET/$KEY/ images/ --no-progress
 aws s3 cp s3://$BUCKET/settings.yaml .
+aws s3 cp s3://$BUCKET/$KEY/settings.yaml . || true
+aws s3 cp s3://$BUCKET/$KEY/boundary.json . || true
+aws s3 cp s3://$BUCKET/$KEY/gcp_list.txt . || true
 
-# try using an overriden settings file
-aws s3 cp s3://$BUCKET/$KEY/settings.yaml .  || true
-
-# try copying a boundary
-aws s3 cp s3://$BUCKET/$KEY/boundary.json .  || true
-
-# try copying a GCP file
-aws s3 cp s3://$BUCKET/$KEY/gcp_list.txt .  || true
-
-BOUNDARY="--auto-boundary"
-if test -f "boundary.json"; then
-    BOUNDARY="--boundary boundary.json"
+# Check for boundary file
+BOUNDARY_ARG="--auto-boundary"
+if test -f "/local/code/boundary.json"; then
+    echo "Using custom boundary file."
+    BOUNDARY_ARG="--boundary /local/code/boundary.json"
 fi
 
-#python3 /code/run.py --rerun-all --project-path ..
-python3 /code/run.py --rerun-all $BOUNDARY --project-path .. 2>&1 | tee odm_$KEY-process.log
+# --- 5. EXECUTE ODM ---
+cd /code
 
-ls -al
+echo "Starting ODM run..."
 
-# copy ODM products
-PRODUCTS=$(ls -d odm_* 3d_tile*)
-for val in $PRODUCTS;
-do
-    aws s3 sync $val s3://$BUCKET/$KEY/$OUTPUT/$val --no-progress
-done
+python3 run.py --rerun-all $BOUNDARY_ARG \
+    --project-path /local \
+    2>&1 | tee /local/code/odm_process.log
 
-# copy the log
-aws s3 cp odm_$KEY-process.log s3://$BUCKET/$KEY/$OUTPUT/odm_$KEY-process.log
+# --- 6. UPLOAD RESULTS ---
+echo "Run complete. Syncing results..."
+cd /local/code
 
-# try to copy the EPT data (it isn't named odm_*)
-aws s3 sync entwine_pointcloud s3://$BUCKET/$KEY/$OUTPUT/entwine_pointcloud --no-progress  || exit 0
+aws s3 sync . s3://$BUCKET/$KEY/$OUTPUT/ --exclude "*" --include "odm_*" --include "3d_tile*" --no-progress || true
+aws s3 cp odm_process.log s3://$BUCKET/$KEY/$OUTPUT/odm_process.log || true
+
+echo "Job Complete."
