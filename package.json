@@ -5,7 +5,7 @@
     "serverless-opendronemap": "bin/serverless-opendronemap.js"
   },
   "scripts": {
-    "postinstall": "cd functions/dispatch-handler && npm install",
+    "postinstall": "cd functions/dispatch-handler && npm install && cd ../sns-handler && npm install",
     "build": "tsc",
     "watch": "tsc -w",
     "test": "exit 0",
