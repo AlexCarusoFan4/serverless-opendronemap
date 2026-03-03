@@ -71,7 +71,8 @@ export class ServerlessOdmStack extends cdk.Stack {
       maxvCpus: awsConfig.computeEnv.maxvCpus,
       instanceTypes: awsConfig.computeEnv.instanceTypes,
       instanceRole: dockerRole,
-      launchTemplate: launchTemplate
+      launchTemplate: launchTemplate,
+      useOptimalInstanceClasses: false
     });
 
     const jobQueue = new batch.JobQueue(this, 'ServerlessOdmJobQueue', {
