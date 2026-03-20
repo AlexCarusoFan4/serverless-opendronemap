@@ -53,6 +53,10 @@ fi
 # --- 5. EXECUTE ODM ---
 cd /code
 
+# Patch ODM 3.5.6 boundary.py: CRS.from_proj4() rejects authority codes (EPSG:4326,
+# OGC:CRS84) returned by newer fiona. CRS.from_user_input() handles all formats.
+sed -i 's/CRS\.from_proj4(fiona\.crs\.to_string(src\.crs))/CRS.from_user_input(fiona.crs.to_string(src.crs))/g' /code/opendm/boundary.py
+
 echo "Starting ODM run..."
 
 python3 run.py --rerun-all $BOUNDARY_ARG \
