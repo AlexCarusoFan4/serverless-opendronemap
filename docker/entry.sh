@@ -38,7 +38,7 @@ echo "Temporary Directory set to: $TMPDIR"
 cd /local/code
 echo "Downloading imagery..."
 aws s3 sync s3://$BUCKET/$KEY/ images/ --no-progress
-aws s3 cp s3://$BUCKET/settings.yaml .
+aws s3 cp s3://$BUCKET/settings.yaml . || true
 aws s3 cp s3://$BUCKET/$KEY/settings.yaml . || true
 aws s3 cp s3://$BUCKET/$KEY/boundary.json . || true
 aws s3 cp s3://$BUCKET/$KEY/gcp_list.txt . || true
@@ -57,9 +57,37 @@ cd /code
 # OGC:CRS84) returned by newer fiona. CRS.from_user_input() handles all formats.
 sed -i 's/CRS\.from_proj4(fiona\.crs\.to_string(src\.crs))/CRS.from_user_input(fiona.crs.to_string(src.crs))/g' /code/opendm/boundary.py
 
+# Parse YAML to CLI arguments
+echo "Parsing settings.yaml into command line arguments..."
+YAML_ARGS=""
+if test -f "/local/code/settings.yaml"; then
+    YAML_ARGS=$(python3 -c "
+import yaml
+try:
+    with open('/local/code/settings.yaml') as f:
+        d = yaml.safe_load(f) or {}
+    args = []
+    for k, v in d.items():
+        k_arg = k.replace('_', '-')
+        if str(v).lower() == 'true':
+            args.append(f'--{k_arg}')
+        elif str(v).lower() == 'false':
+            continue  # Omit flag entirely if false
+        else:
+            args.append(f'--{k_arg} {v}')
+    print(' '.join(args))
+except Exception as e:
+    print(f'') # Fail silently on python side, handled by bash
+")
+    echo "Parsed arguments: $YAML_ARGS"
+else
+    echo "No settings.yaml found, proceeding with defaults."
+fi
+
 echo "Starting ODM run..."
 
-python3 run.py --rerun-all $BOUNDARY_ARG \
+# Inject the parsed $YAML_ARGS directly into the python3 execution
+python3 run.py --rerun-all $BOUNDARY_ARG $YAML_ARGS \
     --project-path /local \
     2>&1 | tee /local/code/odm_process.log
 
