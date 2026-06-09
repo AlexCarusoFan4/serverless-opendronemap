@@ -25,6 +25,9 @@ BUCKET="$4"
 KEY="$5"
 OUTPUT="$6"
 
+# Ensure clean slate
+rm -rf /local/code
+
 mkdir -p /local/code/images
 mkdir -p /local/code/tmp
 
@@ -37,7 +40,7 @@ echo "Temporary Directory set to: $TMPDIR"
 # --- 4. DOWNLOAD DATA ---
 cd /local/code
 echo "Downloading imagery..."
-aws s3 sync s3://$BUCKET/$KEY/ images/ --no-progress
+aws s3 sync s3://$BUCKET/$KEY/ images/ --delete --exclude "progress.json" --no-progress
 aws s3 cp s3://$BUCKET/settings.yaml . || true
 aws s3 cp s3://$BUCKET/$KEY/settings.yaml . || true
 aws s3 cp s3://$BUCKET/$KEY/boundary.json . || true
