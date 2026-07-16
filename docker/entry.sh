@@ -46,6 +46,13 @@ aws s3 cp s3://$BUCKET/$KEY/settings.yaml . || true
 aws s3 cp s3://$BUCKET/$KEY/boundary.json . || true
 aws s3 cp s3://$BUCKET/$KEY/gcp_list.txt . || true
 
+# Strip proprietary MakerNotes to avoid exifread crashing on malformed DJI blobs.
+# MakerNotes are not used by ODM (GPS/focal length are standard EXIF; RTK is XMP).
+# -overwrite_original is required so exiftool does NOT leave *_original backups
+# that ODM would then try to load as images.
+echo "Stripping MakerNotes from imagery..."
+exiftool -MakerNotes= -overwrite_original -q -r /local/code/images/ || true
+
 # Check for boundary file
 BOUNDARY_ARG="--auto-boundary"
 if test -f "/local/code/boundary.json"; then
