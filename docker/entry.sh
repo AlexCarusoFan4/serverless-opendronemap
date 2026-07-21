@@ -46,13 +46,6 @@ aws s3 cp s3://$BUCKET/$KEY/settings.yaml . || true
 aws s3 cp s3://$BUCKET/$KEY/boundary.json . || true
 aws s3 cp s3://$BUCKET/$KEY/gcp_list.txt . || true
 
-# Strip proprietary MakerNotes to avoid exifread crashing on malformed DJI blobs.
-# MakerNotes are not used by ODM (GPS/focal length are standard EXIF; RTK is XMP).
-# -overwrite_original is required so exiftool does NOT leave *_original backups
-# that ODM would then try to load as images.
-echo "Stripping MakerNotes from imagery..."
-exiftool -MakerNotes= -overwrite_original -q -r /local/code/images/ || true
-
 # Check for boundary file
 BOUNDARY_ARG="--auto-boundary"
 if test -f "/local/code/boundary.json"; then
@@ -66,6 +59,15 @@ cd /code
 # Patch ODM 3.5.6 boundary.py: CRS.from_proj4() rejects authority codes (EPSG:4326,
 # OGC:CRS84) returned by newer fiona. CRS.from_user_input() handles all formats.
 sed -i 's/CRS\.from_proj4(fiona\.crs\.to_string(src\.crs))/CRS.from_user_input(fiona.crs.to_string(src.crs))/g' /code/opendm/boundary.py
+grep -q 'CRS.from_user_input(fiona.crs.to_string(src.crs))' /code/opendm/boundary.py \
+    && echo "boundary.py CRS patch applied" \
+    || echo "WARNING: boundary.py CRS patch did NOT apply — check ODM version"
+
+# Patch exifread to safely handle malformed DJI MakerNotes (empty values[0] -> IndexError)
+sed -i 's/printable = str(values\[0\])/printable = str(values[0]) if values else ""/g' /code/venv/lib/python3.12/site-packages/exifread/core/exif_header.py
+grep -q 'str(values\[0\]) if values' /code/venv/lib/python3.12/site-packages/exifread/core/exif_header.py \
+    && echo "exifread MakerNote patch applied" \
+    || echo "WARNING: exifread MakerNote patch did NOT apply — check exifread version"
 
 # Parse YAML to CLI arguments
 echo "Parsing settings.yaml into command line arguments..."
